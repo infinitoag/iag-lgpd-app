@@ -51,6 +51,19 @@ Depois, inicialize com `iagLGPDApp(args)`:
 </script>
 ```
 
+## Exemplo de uso rápido:
+
+```html
+<script src="https://www.infinitoag.com/iag-lgpd-app/iaglpgdapp.min.js"></script>
+<script>
+  var args = {
+    gtm: 'XXX-XXXXX',    
+    policy_url: 'https://########'
+  };
+  iagLGPDApp(args);
+</script>
+```
+
 ## Parâmetros disponíveis
 
 | Parâmetro | Tipo | Padrão | Descrição |
