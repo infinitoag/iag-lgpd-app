@@ -19,6 +19,7 @@
     tags_after: [],
     useConsentModeV2: false,
     gtm: '',
+    fb_pixel_id: '',
   };
 
   function safeGet(arg, key) {
@@ -103,6 +104,20 @@
     head.appendChild(gtmScript);
   }
 
+  function injectFacebookPixel(pixelId) {
+    if (!pixelId) return;
+    var pixelKey = String(pixelId);
+    window.__iagLGPDFacebookPixels = window.__iagLGPDFacebookPixels || {};
+    if (window.__iagLGPDFacebookPixels[pixelKey]) return;
+    window.__iagLGPDFacebookPixels[pixelKey] = true;
+
+    var head = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.text = "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init'," + JSON.stringify(pixelKey) + ");fbq('track','PageView');";
+    head.appendChild(script);
+  }
+
   function updateConsentV2() {
     var consentData = {
       ad_storage: 'granted',
@@ -130,6 +145,9 @@
     setCookie(COOKIE_NAME, 'accepted', COOKIE_EXPIRY_DAYS);
     if (Array.isArray(options.tags_after) && options.tags_after.length) {
       injectTags(options.tags_after);
+    }
+    if (options.fb_pixel_id && options.useConsentModeV2) {
+      injectFacebookPixel(options.fb_pixel_id);
     }
     if (options.gtm && options.useConsentModeV2) {
       updateConsentV2();
@@ -249,6 +267,7 @@
     options.show_reject_button = Boolean(options.show_reject_button);
     options.useConsentModeV2 = Boolean(options.useConsentModeV2);
     options.gtm = typeof options.gtm === 'string' ? options.gtm.trim() : '';
+    options.fb_pixel_id = typeof options.fb_pixel_id === 'number' || typeof options.fb_pixel_id === 'string' ? String(options.fb_pixel_id).trim() : '';
     options.message = typeof options.message === 'string' && options.message.trim() ? options.message : DEFAULTS.message;
     options.banner_bg_color = typeof options.banner_bg_color === 'string' && options.banner_bg_color.trim() ? options.banner_bg_color : DEFAULTS.banner_bg_color;
     options.banner_text_color = typeof options.banner_text_color === 'string' && options.banner_text_color.trim() ? options.banner_text_color : DEFAULTS.banner_text_color;
@@ -268,6 +287,9 @@
 
     var options = initOptions(args);
     injectTags(options.tags_before);
+    if (options.fb_pixel_id && !options.useConsentModeV2) {
+      injectFacebookPixel(options.fb_pixel_id);
+    }
     if (options.gtm) {
       injectGTM(options.gtm, options.useConsentModeV2);
     }

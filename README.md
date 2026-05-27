@@ -9,6 +9,7 @@ Ele:
 - injeta tags pré-carregadas (`tags_before`) imediatamente
 - injeta tags somente após aceitação (`tags_after`)
 - suporta Google Tag Manager com Consent Mode V2
+- suporta Pixel da Meta/Facebook via ID do pixel
 - grava consentimento em cookie por 30 dias
 - permite recusa com bloqueio de tags opcionais e redirecionamento
 - permite injeção de CSS personalizado no banner
@@ -32,6 +33,7 @@ Depois, inicialize com `iagLGPDApp(args)`:
 <script>
   iagLGPDApp({
     gtm: 'GTM-PP4FJKV',
+    fb_pixel_id: '1478574446314777',
     banner_type: 'bottom_bar',
     policy_url: 'https://usitom.com.br/politica-de-privacidade/',
     show_reject_button: true,
@@ -70,6 +72,7 @@ Depois, inicialize com `iagLGPDApp(args)`:
 |---|---|---|---|
 | `gtm` | `string` | `''` | Código do Google Tag Manager (ex: `GTM-XXXXXXX`). | 
 | `useConsentModeV2` | `boolean` | `false` | Ativa o Consent Mode V2 quando `gtm` está definido. | 
+| `fb_pixel_id` | `string \| number` | `''` | ID do Pixel da Meta/Facebook. Se `useConsentModeV2` estiver ativo, é inserido somente após o aceite. Caso contrário, é inserido no carregamento inicial. |
 | `tags_before` | `string[]` | `[]` | Tags HTML/JS que serão inseridas imediatamente, antes da decisão do usuário. |
 | `tags_after` | `string[]` | `[]` | Tags HTML/JS que serão inseridas somente após o usuário aceitar. |
 | `banner_type` | `string` | `bottom_bar` | Formato do banner: `bottom_bar`, `floating_left`, `floating_right`, `modal`. |
@@ -87,6 +90,8 @@ Depois, inicialize com `iagLGPDApp(args)`:
 
 - O banner só é exibido se o cookie `iag_lgpd_consent` não existir.
 - Após aceitar, o cookie é gravado por 30 dias e `tags_after` são injetadas.
+- Com `useConsentModeV2: true`, o `fb_pixel_id` é carregado somente após aceitar.
+- Com `useConsentModeV2: false`, o `fb_pixel_id` é carregado imediatamente, junto com `tags_before` e GTM.
 - Após recusar, o cookie também é gravado por 30 dias e `tags_after` não são injetadas.
 - Caso `reject_redirect_url` seja informado, o usuário é redirecionado após recusa.
 - Chamadas repetidas a `iagLGPDApp(args)` são ignoradas; o script roda apenas uma vez.
@@ -95,6 +100,7 @@ Depois, inicialize com `iagLGPDApp(args)`:
 
 - `tags_before` são inseridas exatamente como fornecidas.
 - `gtm` com `useConsentModeV2: true` injeta GTM e define consentimento inicial como negado. Após aceitação, envia `gtag('consent','update',...)` com valores `granted`.
+- `fb_pixel_id` gera automaticamente a base do Pixel da Meta/Facebook e dispara `PageView`.
 - O CSS padrão garante responsividade e `z-index` alto para aparecer acima do conteúdo.
 
 ## Repositório Git
