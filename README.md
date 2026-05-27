@@ -2,7 +2,7 @@
 
 ## Sobre o projeto
 
-`iag-lgpd-app` é um gerenciador de consentimento de cookies em JavaScript puro, sem dependências externas. O script foi desenvolvido para ser hospedado em um domínio centralizado e importado por sites via `<script src="..."></script>`.
+git remote add origin https://github.com/infinitoag/iag-lgpd-app.git
 
 Ele: 
 - exibe banner de cookies em diferentes formatos

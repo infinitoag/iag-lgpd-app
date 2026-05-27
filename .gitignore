@@ -1,0 +1,14 @@
+# Node artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# OS files
+.DS_Store
+
+# Editor files
+*.swp
+*.swo
