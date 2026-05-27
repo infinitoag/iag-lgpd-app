@@ -6,7 +6,7 @@
   var COOKIE_EXPIRY_DAYS = 30;
   var DEFAULTS = {
     banner_type: 'bottom_bar',
-    message: 'Este site utiliza cookies para melhorar sua experiência. Ao continuar, você aceita o uso de cookies.',
+    message: 'Valorizamos sua privacidade Utilizamos cookies para melhorar sua experiência e personalizar conteúdo. Ao clicar em "Aceitar", você concorda com o uso de todos os cookies.',
     banner_bg_color: '#FFF',
     banner_text_color: '#000',
     btn_bg_color: '#000',
