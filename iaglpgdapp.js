@@ -20,6 +20,7 @@
     useConsentModeV2: false,
     gtm: '',
     fb_pixel_id: '',
+    debug: false,
   };
 
   function safeGet(arg, key) {
@@ -51,7 +52,30 @@
     return getCookie(COOKIE_NAME) === null;
   }
 
-  function appendHTML(html, location) {
+  function debugLog(options, step, payload) {
+    if (!options || !options.debug || !window.console || typeof window.console.log !== 'function') return;
+    window.console.log('[IAG LGPD App]', step, payload || {});
+  }
+
+  function mergeDebugPayload(base, extra) {
+    var payload = {};
+    var key;
+    base = base || {};
+    extra = extra || {};
+    for (key in base) {
+      if (Object.prototype.hasOwnProperty.call(base, key)) {
+        payload[key] = base[key];
+      }
+    }
+    for (key in extra) {
+      if (Object.prototype.hasOwnProperty.call(extra, key)) {
+        payload[key] = extra[key];
+      }
+    }
+    return payload;
+  }
+
+  function appendHTML(html, location, options, debugPayload) {
     var wrapper = document.createElement('div');
     wrapper.innerHTML = html;
     Array.prototype.slice.call(wrapper.childNodes).forEach(function (node) {
@@ -64,18 +88,36 @@
         script.text = node.textContent;
         script.async = false;
         location.appendChild(script);
+        debugLog(options, 'tag_disparada', mergeDebugPayload(debugPayload, {
+          tipo: 'script',
+          atributos: Array.prototype.slice.call(script.attributes).map(function (attr) {
+            return { nome: attr.name, valor: attr.value };
+          }),
+          conteudo: script.text,
+        }));
       } else {
         location.appendChild(node);
+        debugLog(options, 'tag_disparada', mergeDebugPayload(debugPayload, {
+          tipo: node.nodeName.toLowerCase(),
+          conteudo: node.outerHTML || node.textContent,
+        }));
       }
     });
   }
 
-  function injectTags(tags) {
-    if (!Array.isArray(tags) || tags.length === 0) return;
+  function injectTags(tags, options, origin) {
+    if (!Array.isArray(tags) || tags.length === 0) {
+      debugLog(options, origin + '_ignorado', { motivo: 'Nenhuma tag configurada' });
+      return;
+    }
     var target = document.body || document.head || document.documentElement;
-    tags.forEach(function (tagString) {
-      if (typeof tagString !== 'string' || !tagString.trim()) return;
-      appendHTML(tagString, target);
+    debugLog(options, origin + '_inicio', { total: tags.length, destino: target.nodeName.toLowerCase() });
+    tags.forEach(function (tagString, index) {
+      if (typeof tagString !== 'string' || !tagString.trim()) {
+        debugLog(options, 'tag_ignorada', { origem: origin, index: index, motivo: 'Tag vazia ou inválida', valor: tagString });
+        return;
+      }
+      appendHTML(tagString, target, options, { origem: origin, index: index, html_original: tagString });
     });
   }
 
@@ -87,28 +129,45 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
-  function injectGTM(gtmId, useConsentModeV2) {
+  function injectGTM(gtmId, useConsentModeV2, options) {
     if (!gtmId || typeof gtmId !== 'string') return;
     var head = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
 
     if (useConsentModeV2) {
+      var defaultConsentData = {
+        ad_storage: 'denied',
+        analytics_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        functionality_storage: 'denied',
+        security_storage: 'denied',
+      };
       var configScript = document.createElement('script');
       configScript.type = 'text/javascript';
       configScript.text = "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',functionality_storage:'denied',security_storage:'denied'});gtag('js', new Date());";
       head.appendChild(configScript);
+      debugLog(options, 'consent_mode_v2_default_disparado', {
+        destino: 'gtag',
+        comando: ['consent', 'default', defaultConsentData],
+        consentData: defaultConsentData,
+      });
     }
 
     var gtmScript = document.createElement('script');
     gtmScript.async = true;
     gtmScript.src = 'https://www.googletagmanager.com/gtm.js?id=' + encodeURIComponent(gtmId);
     head.appendChild(gtmScript);
+    debugLog(options, 'gtm_disparado', { id: gtmId, src: gtmScript.src });
   }
 
-  function injectFacebookPixel(pixelId) {
+  function injectFacebookPixel(pixelId, options, origin) {
     if (!pixelId) return;
     var pixelKey = String(pixelId);
     window.__iagLGPDFacebookPixels = window.__iagLGPDFacebookPixels || {};
-    if (window.__iagLGPDFacebookPixels[pixelKey]) return;
+    if (window.__iagLGPDFacebookPixels[pixelKey]) {
+      debugLog(options, 'facebook_pixel_ignorado', { origem: origin, pixelId: pixelKey, motivo: 'Pixel já disparado' });
+      return;
+    }
     window.__iagLGPDFacebookPixels[pixelKey] = true;
 
     var head = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
@@ -116,9 +175,17 @@
     script.type = 'text/javascript';
     script.text = "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init'," + JSON.stringify(pixelKey) + ");fbq('track','PageView');";
     head.appendChild(script);
+    debugLog(options, 'facebook_pixel_disparado', {
+      origem: origin,
+      pixelId: pixelKey,
+      comandos: [
+        ['init', pixelKey],
+        ['track', 'PageView'],
+      ],
+    });
   }
 
-  function updateConsentV2() {
+  function updateConsentV2(options) {
     var consentData = {
       ad_storage: 'granted',
       analytics_storage: 'granted',
@@ -128,12 +195,28 @@
       security_storage: 'granted',
     };
     if (typeof window.gtag === 'function') {
+      debugLog(options, 'consent_mode_v2_update_disparado', {
+        destino: 'gtag',
+        comando: ['consent', 'update', consentData],
+        consentData: consentData,
+      });
       window.gtag('consent', 'update', consentData);
       return;
     }
     if (Array.isArray(window.dataLayer)) {
-      window.dataLayer.push({ event: 'iag_lgpd_consent_update', 'gtm.consent': consentData });
+      var dataLayerPayload = { event: 'iag_lgpd_consent_update', 'gtm.consent': consentData };
+      debugLog(options, 'consent_mode_v2_update_disparado', {
+        destino: 'dataLayer',
+        payload: dataLayerPayload,
+        consentData: consentData,
+      });
+      window.dataLayer.push(dataLayerPayload);
+      return;
     }
+    debugLog(options, 'consent_mode_v2_update_nao_disparado', {
+      motivo: 'gtag indisponível e dataLayer inexistente',
+      consentData: consentData,
+    });
   }
 
   function hideBanner(banner) {
@@ -142,27 +225,34 @@
   }
 
   function handleAccept(options) {
+    debugLog(options, 'consent_aceito_inicio', {});
     setCookie(COOKIE_NAME, 'accepted', COOKIE_EXPIRY_DAYS);
+    debugLog(options, 'cookie_disparado', { nome: COOKIE_NAME, valor: 'accepted', expiracao_dias: COOKIE_EXPIRY_DAYS });
     if (Array.isArray(options.tags_after) && options.tags_after.length) {
-      injectTags(options.tags_after);
+      injectTags(options.tags_after, options, 'tags_after');
     }
     if (options.fb_pixel_id && options.useConsentModeV2) {
-      injectFacebookPixel(options.fb_pixel_id);
+      injectFacebookPixel(options.fb_pixel_id, options, 'consent_aceito');
     }
     if (options.gtm && options.useConsentModeV2) {
-      updateConsentV2();
+      updateConsentV2(options);
     }
     if (options._bannerInstance) {
       hideBanner(options._bannerInstance);
+      debugLog(options, 'banner_ocultado', {});
     }
   }
 
   function handleReject(options) {
+    debugLog(options, 'consent_recusado_inicio', {});
     setCookie(COOKIE_NAME, 'rejected', COOKIE_EXPIRY_DAYS);
+    debugLog(options, 'cookie_disparado', { nome: COOKIE_NAME, valor: 'rejected', expiracao_dias: COOKIE_EXPIRY_DAYS });
     if (options._bannerInstance) {
       hideBanner(options._bannerInstance);
+      debugLog(options, 'banner_ocultado', {});
     }
     if (options.reject_redirect_url) {
+      debugLog(options, 'redirecionamento_disparado', { url: options.reject_redirect_url });
       window.location.href = options.reject_redirect_url;
     }
   }
@@ -266,6 +356,7 @@
     options.tags_after = Array.isArray(options.tags_after) ? options.tags_after : DEFAULTS.tags_after;
     options.show_reject_button = Boolean(options.show_reject_button);
     options.useConsentModeV2 = Boolean(options.useConsentModeV2);
+    options.debug = Boolean(options.debug);
     options.gtm = typeof options.gtm === 'string' ? options.gtm.trim() : '';
     options.fb_pixel_id = typeof options.fb_pixel_id === 'number' || typeof options.fb_pixel_id === 'string' ? String(options.fb_pixel_id).trim() : '';
     options.message = typeof options.message === 'string' && options.message.trim() ? options.message : DEFAULTS.message;
@@ -283,23 +374,34 @@
     if (window.__iagLGPDAppHasRun) return;
     window.__iagLGPDAppHasRun = true;
 
-    if (!isBannerVisible()) return;
-
     var options = initOptions(args);
-    injectTags(options.tags_before);
+    debugLog(options, 'inicio', {
+      cookie: getCookie(COOKIE_NAME),
+      bannerVisivel: isBannerVisible(),
+      opcoes: options,
+    });
+
+    if (!isBannerVisible()) {
+      debugLog(options, 'execucao_interrompida', { motivo: 'Consentimento já registrado', cookie: getCookie(COOKIE_NAME) });
+      return;
+    }
+
+    injectTags(options.tags_before, options, 'tags_before');
     if (options.fb_pixel_id && !options.useConsentModeV2) {
-      injectFacebookPixel(options.fb_pixel_id);
+      injectFacebookPixel(options.fb_pixel_id, options, 'antes_do_consentimento');
     }
     if (options.gtm) {
-      injectGTM(options.gtm, options.useConsentModeV2);
+      injectGTM(options.gtm, options.useConsentModeV2, options);
     }
     applyBannerStyles(options);
+    debugLog(options, 'estilos_disparados', { custom_css: Boolean(options.custom_css) });
 
     var createBanner = function () {
       if (!document.body) return;
       var banner = buildBannerMarkup(options);
       options._bannerInstance = banner;
       banner.style.display = 'flex';
+      debugLog(options, 'banner_disparado', { tipo: options.banner_type });
     };
 
     if (document.body) {

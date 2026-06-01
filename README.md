@@ -16,6 +16,7 @@ O projeto foi criado para facilitar a implementação de avisos de cookies com s
 - Botão opcional para recusa.
 - Redirecionamento opcional após recusa.
 - Personalização básica de cores e CSS.
+- Modo debug opcional via `console.log`.
 - Execução única por carregamento de página.
 
 ## Arquivos
@@ -64,6 +65,7 @@ Depois, inicialize o banner com `iagLGPDApp()`:
     banner_text_color: '#000000',
     btn_bg_color: '#000000',
     btn_text_color: '#ffffff',
+    debug: true,
     tags_before: [
       '<script>console.log("Executado antes do consentimento");<\/script>'
     ],
@@ -94,6 +96,7 @@ Depois, inicialize o banner com `iagLGPDApp()`:
 | `btn_bg_color` | `string` | `#000` | Cor de fundo dos botões. |
 | `btn_text_color` | `string` | `#FFF` | Cor do texto dos botões. |
 | `custom_css` | `string` | `''` | CSS adicional aplicado ao banner. |
+| `debug` | `boolean` | `false` | Ativa logs no console com as etapas do processo e os valores disparados. |
 
 ## Comportamento
 
@@ -107,6 +110,40 @@ Depois, inicialize o banner com `iagLGPDApp()`:
 - Com `useConsentModeV2: false`, o Pixel da Meta/Facebook é carregado no início, se `fb_pixel_id` estiver configurado.
 - Se `reject_redirect_url` for informado, o usuário é redirecionado após recusar.
 - Chamadas repetidas para `iagLGPDApp()` são ignoradas no mesmo carregamento de página.
+
+## Debug
+
+Para debugar o fluxo, inicialize com `debug: true`:
+
+```html
+<script>
+  iagLGPDApp({
+    debug: true,
+    gtm: 'GTM-XXXXXXX',
+    useConsentModeV2: true,
+    tags_before: [
+      '<script>console.log("Tag before");<\/script>'
+    ],
+    tags_after: [
+      '<script>console.log("Tag after");<\/script>'
+    ]
+  });
+</script>
+```
+
+Com o debug ativo, o script registra no console:
+
+- início da execução;
+- cookie atual de consentimento;
+- `tags_before` disparadas;
+- `tags_after` disparadas após o aceite;
+- GTM carregado;
+- Pixel da Meta/Facebook carregado;
+- aceite ou recusa;
+- cookie gravado;
+- payload enviado ao Consent Mode V2.
+
+No `updateConsentV2`, o log inclui o objeto `consentData` exatamente como enviado ao `gtag` ou ao `dataLayer`.
 
 ## Observações técnicas
 
