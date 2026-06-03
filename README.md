@@ -103,13 +103,69 @@ Depois, inicialize o banner com `iagLGPDApp()`:
 - O banner é exibido apenas quando o cookie `iag_lgpd_consent` não existe.
 - Ao aceitar, o script grava o cookie com valor `accepted` por 30 dias.
 - Ao recusar, o script grava o cookie com valor `rejected` por 30 dias.
-- `tags_before` são executadas no carregamento inicial do script.
-- `tags_after` são executadas somente após o aceite.
-- Com `useConsentModeV2: true`, o GTM inicia com consentimento negado e atualiza para concedido após o aceite.
+- Com `useConsentModeV2: true` e `gtm` configurado, o script injeta no `<head>` o estado padrão de consentimento negado antes de abrir o banner.
+- Depois do estado padrão de consentimento, o script injeta no `<head>` a Google Tag com o ID informado em `gtm`.
+- Depois da Google Tag, `tags_before` são inseridas no `<head>` exatamente como recebidas.
+- O banner é exibido após a injeção da Google Tag e de `tags_before`.
+- Após o aceite, o script injeta no `<head>` o update de consentimento concedido.
+- Depois do update de consentimento, `tags_after` são inseridas no `<head>` exatamente como recebidas.
 - Com `useConsentModeV2: true`, o Pixel da Meta/Facebook é carregado somente após o aceite.
 - Com `useConsentModeV2: false`, o Pixel da Meta/Facebook é carregado no início, se `fb_pixel_id` estiver configurado.
 - Se `reject_redirect_url` for informado, o usuário é redirecionado após recusar.
 - Chamadas repetidas para `iagLGPDApp()` são ignoradas no mesmo carregamento de página.
+
+## Ordem de injeção no head
+
+Quando `gtm` e `useConsentModeV2: true` estiverem configurados, a ordem de injeção é:
+
+1. Estado padrão de consentimento negado.
+2. Google Tag padrão com o ID informado em `gtm`.
+3. Tags configuradas em `tags_before`.
+4. Banner/modal de consentimento.
+5. Após o aceite, update de consentimento concedido.
+6. Tags configuradas em `tags_after`.
+
+O trecho inicial inserido antes do banner segue esta estrutura:
+
+```html
+<!-- 1. Definir o estado de consentimento padrão -->
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+
+  // No Modo Avançado, definimos como 'denied' por padrão para regiões como o EEE/Brasil
+  gtag('consent', 'default', {
+    'ad_storage': 'denied',              // Bloqueia cookies de anúncios
+    'ad_user_data': 'denied',            // Bloqueia envio de dados de usuário
+    'ad_personalization': 'denied',      // Bloqueia remarketing
+    'analytics_storage': 'denied',       // Bloqueia cookies de estatísticas
+    'wait_for_update': 500               // (Opcional) Tempo para esperar o banner carregar
+  });
+</script>
+
+<!-- 2. Carregar a Google Tag (Snippet padrão) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=TAG_ID"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'TAG_ID'); // Aqui a tag dispara o "ping" anônimo porque o padrão é 'denied'
+</script>
+```
+
+Após o aceite, este trecho é inserido no `<head>`:
+
+```html
+<!-- 3. Este comando avisa ao Google que o usuário deu permissão -->
+<script>
+gtag('consent', 'update', {
+  'ad_storage': 'granted',
+  'ad_user_data': 'granted',
+  'ad_personalization': 'granted',
+  'analytics_storage': 'granted'
+});
+</script>
+```
 
 ## Debug
 
@@ -137,17 +193,19 @@ Com o debug ativo, o script registra no console:
 - cookie atual de consentimento;
 - `tags_before` disparadas;
 - `tags_after` disparadas após o aceite;
-- GTM carregado;
+- Google Tag carregada;
 - Pixel da Meta/Facebook carregado;
 - aceite ou recusa;
 - cookie gravado;
 - payload enviado ao Consent Mode V2.
 
-No `updateConsentV2`, o log inclui o objeto `consentData` exatamente como enviado ao `gtag` ou ao `dataLayer`.
+No update do Consent Mode V2, o log inclui o objeto `consentData` usado no trecho injetado no `<head>`.
 
 ## Observações técnicas
 
-- As tags informadas em `tags_before` e `tags_after` são inseridas exatamente como recebidas.
+- As tags informadas em `tags_before` e `tags_after` são inseridas exatamente como recebidas no `<head>`.
+- Os comentários dos snippets do Google são criados como nós reais de comentário no DOM.
+- Como a injeção é feita por JavaScript em runtime, valide o resultado em DevTools > Elements > `head`. A opção "Exibir código-fonte da página" mostra apenas o HTML original recebido do servidor.
 - O cookie usa `path=/` e `SameSite=Lax`.
 - O CSS padrão inclui responsividade e `z-index` alto para manter o banner visível acima do conteúdo da página.
 - O link da política de privacidade abre em nova aba com `rel="noopener noreferrer"`.

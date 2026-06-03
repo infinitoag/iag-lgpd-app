@@ -86,7 +86,9 @@
           script.setAttribute(attr.name, attr.value);
         }
         script.text = node.textContent;
-        script.async = false;
+        if (!node.hasAttribute('async')) {
+          script.async = false;
+        }
         location.appendChild(script);
         debugLog(options, 'tag_disparada', mergeDebugPayload(debugPayload, {
           tipo: 'script',
@@ -105,12 +107,17 @@
     });
   }
 
+  function injectHTML(html, location, options, origin) {
+    if (typeof html !== 'string' || !html.trim()) return;
+    appendHTML(html, location, options, { origem: origin, html_original: html });
+  }
+
   function injectTags(tags, options, origin) {
     if (!Array.isArray(tags) || tags.length === 0) {
       debugLog(options, origin + '_ignorado', { motivo: 'Nenhuma tag configurada' });
       return;
     }
-    var target = document.body || document.head || document.documentElement;
+    var target = document.head || document.body || document.documentElement;
     debugLog(options, origin + '_inicio', { total: tags.length, destino: target.nodeName.toLowerCase() });
     tags.forEach(function (tagString, index) {
       if (typeof tagString !== 'string' || !tagString.trim()) {
@@ -121,6 +128,30 @@
     });
   }
 
+  function appendReadableHeadNode(head, node) {
+    head.appendChild(document.createTextNode('\n'));
+    head.appendChild(node);
+  }
+
+  function appendReadableHeadComment(head, comment) {
+    appendReadableHeadNode(head, document.createComment(comment));
+  }
+
+  function appendReadableHeadScript(head, code) {
+    var script = document.createElement('script');
+    script.text = code;
+    appendReadableHeadNode(head, script);
+    return script;
+  }
+
+  function appendReadableHeadExternalScript(head, src) {
+    var script = document.createElement('script');
+    script.async = true;
+    script.src = src;
+    appendReadableHeadNode(head, script);
+    return script;
+  }
+
   function injectStyles(styles) {
     if (typeof styles !== 'string' || !styles.trim()) return;
     var style = document.createElement('style');
@@ -129,28 +160,51 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
-  function injectGTM(gtmId, useConsentModeV2, options) {
+  function buildGTMDefaultConsentCode() {
+    return '  window.dataLayer = window.dataLayer || [];\n' +
+      '  function gtag(){dataLayer.push(arguments);}\n' +
+      '\n' +
+      "  // No Modo Avançado, definimos como 'denied' por padrão para regiões como o EEE/Brasil\n" +
+      "  gtag('consent', 'default', {\n" +
+      "    'ad_storage': 'denied',              // Bloqueia cookies de anúncios\n" +
+      "    'ad_user_data': 'denied',            // Bloqueia envio de dados de usuário\n" +
+      "    'ad_personalization': 'denied',      // Bloqueia remarketing\n" +
+      "    'analytics_storage': 'denied',       // Bloqueia cookies de estatísticas\n" +
+      "    'wait_for_update': 500               // (Opcional) Tempo para esperar o banner carregar\n" +
+      '  });';
+  }
+
+  function buildGTMConfigCode(gtmId) {
+    return '  window.dataLayer = window.dataLayer || [];\n' +
+      '  function gtag(){dataLayer.push(arguments);}\n' +
+      "  gtag('js', new Date());\n" +
+      "  gtag('config', '" + gtmId + "'); // Aqui a tag dispara o \"ping\" anônimo porque o padrão é 'denied'";
+  }
+
+  function injectGTMBeforeConsent(gtmId, useConsentModeV2, options) {
     if (!gtmId || typeof gtmId !== 'string') return;
     var head = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
 
     if (useConsentModeV2) {
       var defaultConsentData = {
         ad_storage: 'denied',
-        analytics_storage: 'denied',
         ad_user_data: 'denied',
         ad_personalization: 'denied',
-        functionality_storage: 'denied',
-        security_storage: 'denied',
+        analytics_storage: 'denied',
+        wait_for_update: 500,
       };
-      var configScript = document.createElement('script');
-      configScript.type = 'text/javascript';
-      configScript.text = "window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('consent','default',{ad_storage:'denied',analytics_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',functionality_storage:'denied',security_storage:'denied'});gtag('js', new Date());";
-      head.appendChild(configScript);
+      appendReadableHeadComment(head, ' 1. Definir o estado de consentimento padrão ');
+      appendReadableHeadScript(head, buildGTMDefaultConsentCode());
+      appendReadableHeadComment(head, ' 2. Carregar a Google Tag (Snippet padrão) ');
+      appendReadableHeadExternalScript(head, 'https://www.googletagmanager.com/gtag/js?id=' + gtmId);
+      appendReadableHeadScript(head, buildGTMConfigCode(gtmId));
       debugLog(options, 'consent_mode_v2_default_disparado', {
         destino: 'gtag',
         comando: ['consent', 'default', defaultConsentData],
         consentData: defaultConsentData,
       });
+      debugLog(options, 'gtm_disparado', { id: gtmId, src: 'https://www.googletagmanager.com/gtag/js?id=' + gtmId });
+      return;
     }
 
     var gtmScript = document.createElement('script');
@@ -185,36 +239,28 @@
     });
   }
 
-  function updateConsentV2(options) {
+  function buildGTMConsentUpdateCode() {
+    return "gtag('consent', 'update', {\n" +
+      "  'ad_storage': 'granted',\n" +
+      "  'ad_user_data': 'granted',\n" +
+      "  'ad_personalization': 'granted',\n" +
+      "  'analytics_storage': 'granted'\n" +
+      '});';
+  }
+
+  function injectGTMConsentUpdate(options) {
     var consentData = {
       ad_storage: 'granted',
-      analytics_storage: 'granted',
       ad_user_data: 'granted',
       ad_personalization: 'granted',
-      functionality_storage: 'granted',
-      security_storage: 'granted',
+      analytics_storage: 'granted',
     };
-    if (typeof window.gtag === 'function') {
-      debugLog(options, 'consent_mode_v2_update_disparado', {
-        destino: 'gtag',
-        comando: ['consent', 'update', consentData],
-        consentData: consentData,
-      });
-      window.gtag('consent', 'update', consentData);
-      return;
-    }
-    if (Array.isArray(window.dataLayer)) {
-      var dataLayerPayload = { event: 'iag_lgpd_consent_update', 'gtm.consent': consentData };
-      debugLog(options, 'consent_mode_v2_update_disparado', {
-        destino: 'dataLayer',
-        payload: dataLayerPayload,
-        consentData: consentData,
-      });
-      window.dataLayer.push(dataLayerPayload);
-      return;
-    }
-    debugLog(options, 'consent_mode_v2_update_nao_disparado', {
-      motivo: 'gtag indisponível e dataLayer inexistente',
+    var target = document.head || document.body || document.documentElement;
+    appendReadableHeadComment(target, ' 3. Este comando avisa ao Google que o usuário deu permissão ');
+    appendReadableHeadScript(target, buildGTMConsentUpdateCode());
+    debugLog(options, 'consent_mode_v2_update_disparado', {
+      destino: target.nodeName.toLowerCase(),
+      comando: ['consent', 'update', consentData],
       consentData: consentData,
     });
   }
@@ -228,14 +274,14 @@
     debugLog(options, 'consent_aceito_inicio', {});
     setCookie(COOKIE_NAME, 'accepted', COOKIE_EXPIRY_DAYS);
     debugLog(options, 'cookie_disparado', { nome: COOKIE_NAME, valor: 'accepted', expiracao_dias: COOKIE_EXPIRY_DAYS });
+    if (options.gtm && options.useConsentModeV2) {
+      injectGTMConsentUpdate(options);
+    }
     if (Array.isArray(options.tags_after) && options.tags_after.length) {
       injectTags(options.tags_after, options, 'tags_after');
     }
     if (options.fb_pixel_id && options.useConsentModeV2) {
       injectFacebookPixel(options.fb_pixel_id, options, 'consent_aceito');
-    }
-    if (options.gtm && options.useConsentModeV2) {
-      updateConsentV2(options);
     }
     if (options._bannerInstance) {
       hideBanner(options._bannerInstance);
@@ -386,12 +432,12 @@
       return;
     }
 
+    if (options.gtm) {
+      injectGTMBeforeConsent(options.gtm, options.useConsentModeV2, options);
+    }
     injectTags(options.tags_before, options, 'tags_before');
     if (options.fb_pixel_id && !options.useConsentModeV2) {
       injectFacebookPixel(options.fb_pixel_id, options, 'antes_do_consentimento');
-    }
-    if (options.gtm) {
-      injectGTM(options.gtm, options.useConsentModeV2, options);
     }
     applyBannerStyles(options);
     debugLog(options, 'estilos_disparados', { custom_css: Boolean(options.custom_css) });
