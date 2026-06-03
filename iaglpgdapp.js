@@ -2,7 +2,7 @@
   if (window.__iagLGPDAppLoaded) return;
   window.__iagLGPDAppLoaded = true;
 
-  var COOKIE_NAME = 'iag_lgpd_consent';
+  var COOKIE_NAME = 'iagLgpdConsent';
   var COOKIE_EXPIRY_DAYS = 30;
   var DEFAULTS = {
     banner_type: 'bottom_bar',
@@ -50,6 +50,10 @@
 
   function isBannerVisible() {
     return getCookie(COOKIE_NAME) === null;
+  }
+
+  function isConsentAccepted() {
+    return getCookie(COOKIE_NAME) === 'accepted';
   }
 
   function debugLog(options, step, payload) {
@@ -214,6 +218,16 @@
     debugLog(options, 'gtm_disparado', { id: gtmId, src: gtmScript.src });
   }
 
+  function injectGTMAfterConsent(gtmId, options) {
+    if (!gtmId || typeof gtmId !== 'string') return;
+    var head = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
+
+    appendReadableHeadComment(head, ' Carregar a Google Tag (Snippet padrão) ');
+    appendReadableHeadExternalScript(head, 'https://www.googletagmanager.com/gtag/js?id=' + gtmId);
+    appendReadableHeadScript(head, buildGTMConfigCode(gtmId));
+    debugLog(options, 'gtm_disparado', { id: gtmId, src: 'https://www.googletagmanager.com/gtag/js?id=' + gtmId });
+  }
+
   function injectFacebookPixel(pixelId, options, origin) {
     if (!pixelId) return;
     var pixelKey = String(pixelId);
@@ -300,6 +314,18 @@
     if (options.reject_redirect_url) {
       debugLog(options, 'redirecionamento_disparado', { url: options.reject_redirect_url });
       window.location.href = options.reject_redirect_url;
+    }
+  }
+
+  function injectAcceptedConsentTags(options) {
+    if (options.gtm) {
+      injectGTMAfterConsent(options.gtm, options);
+      injectGTMConsentUpdate(options);
+    }
+    injectTags(options.tags_before, options, 'tags_before');
+    injectTags(options.tags_after, options, 'tags_after');
+    if (options.fb_pixel_id) {
+      injectFacebookPixel(options.fb_pixel_id, options, 'consentimento_previamente_aceito');
     }
   }
 
@@ -427,8 +453,14 @@
       opcoes: options,
     });
 
+    if (isConsentAccepted()) {
+      debugLog(options, 'consentimento_previamente_aceito', { cookie: getCookie(COOKIE_NAME) });
+      injectAcceptedConsentTags(options);
+      return;
+    }
+
     if (!isBannerVisible()) {
-      debugLog(options, 'execucao_interrompida', { motivo: 'Consentimento já registrado', cookie: getCookie(COOKIE_NAME) });
+      debugLog(options, 'execucao_interrompida', { motivo: 'Consentimento não aceito já registrado', cookie: getCookie(COOKIE_NAME) });
       return;
     }
 

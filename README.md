@@ -100,7 +100,7 @@ Depois, inicialize o banner com `iagLGPDApp()`:
 
 ## Comportamento
 
-- O banner é exibido apenas quando o cookie `iag_lgpd_consent` não existe.
+- O banner é exibido apenas quando o cookie `iagLgpdConsent` não existe.
 - Ao aceitar, o script grava o cookie com valor `accepted` por 30 dias.
 - Ao recusar, o script grava o cookie com valor `rejected` por 30 dias.
 - Com `useConsentModeV2: true` e `gtm` configurado, o script injeta no `<head>` o estado padrão de consentimento negado antes de abrir o banner.
@@ -109,6 +109,8 @@ Depois, inicialize o banner com `iagLGPDApp()`:
 - O banner é exibido após a injeção da Google Tag e de `tags_before`.
 - Após o aceite, o script injeta no `<head>` o update de consentimento concedido.
 - Depois do update de consentimento, `tags_after` são inseridas no `<head>` exatamente como recebidas.
+- Em carregamentos seguintes, quando o cookie estiver com valor `accepted`, o script injeta a Google Tag padrão sem o estado padrão negado, aplica o update de consentimento concedido e insere `tags_before`, `tags_after` e Pixel.
+- Quando o cookie estiver com valor `rejected`, o script não exibe o banner e não injeta tags.
 - Com `useConsentModeV2: true`, o Pixel da Meta/Facebook é carregado somente após o aceite.
 - Com `useConsentModeV2: false`, o Pixel da Meta/Facebook é carregado no início, se `fb_pixel_id` estiver configurado.
 - Se `reject_redirect_url` for informado, o usuário é redirecionado após recusar.
@@ -124,6 +126,14 @@ Quando `gtm` e `useConsentModeV2: true` estiverem configurados, a ordem de inje�
 4. Banner/modal de consentimento.
 5. Após o aceite, update de consentimento concedido.
 6. Tags configuradas em `tags_after`.
+
+Em carregamentos seguintes, quando o cookie `iagLgpdConsent=accepted` já existir, a ordem é:
+
+1. Google Tag padrão com o ID informado em `gtm`, sem `gtag('consent', 'default', ...)`.
+2. Update de consentimento concedido.
+3. Tags configuradas em `tags_before`.
+4. Tags configuradas em `tags_after`.
+5. Pixel da Meta/Facebook, se `fb_pixel_id` estiver configurado.
 
 O trecho inicial inserido antes do banner segue esta estrutura:
 
@@ -157,6 +167,28 @@ Após o aceite, este trecho é inserido no `<head>`:
 
 ```html
 <!-- 3. Este comando avisa ao Google que o usuário deu permissão -->
+<script>
+gtag('consent', 'update', {
+  'ad_storage': 'granted',
+  'ad_user_data': 'granted',
+  'ad_personalization': 'granted',
+  'analytics_storage': 'granted'
+});
+</script>
+```
+
+Quando o aceite já estiver registrado em cookie, o trecho da Google Tag carregado no início da página segue esta estrutura:
+
+```html
+<!-- Carregar a Google Tag (Snippet padrão) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=TAG_ID"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'TAG_ID'); // Aqui a tag dispara o "ping" anônimo porque o padrão é 'denied'
+</script>
+
 <script>
 gtag('consent', 'update', {
   'ad_storage': 'granted',
