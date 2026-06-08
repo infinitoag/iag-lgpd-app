@@ -6,7 +6,7 @@
   var COOKIE_EXPIRY_DAYS = 30;
   var DEFAULTS = {
     banner_type: 'bottom_bar',
-    message: 'Valorizamos sua privacidade Utilizamos cookies para melhorar sua experiência e personalizar conteúdo. Ao clicar em "Aceitar", você concorda com o uso de todos os cookies.',
+    message: 'Valorizamos sua privacidade. Utilizamos cookies para melhorar sua experiência e personalizar conteúdo. Ao clicar em "Aceitar", você concorda com o uso de todos os cookies.',
     banner_bg_color: '#FFF',
     banner_text_color: '#000',
     btn_bg_color: '#000',
@@ -348,15 +348,14 @@
     var actions = document.createElement('div');
     actions.className = 'iag-lgpd-actions';
 
-    if (options.policy_url) {
-      var policyLink = document.createElement('a');
-      policyLink.className = 'iag-lgpd-policy-btn';
-      policyLink.href = options.policy_url;
-      policyLink.target = '_blank';
-      policyLink.rel = 'noopener noreferrer';
-      policyLink.textContent = 'Política de Privacidade';
-      actions.appendChild(policyLink);
-    }
+    var accept = document.createElement('button');
+    accept.className = 'iag-lgpd-button iag-lgpd-button-accept';
+    accept.type = 'button';
+    accept.textContent = 'Aceitar';
+    accept.addEventListener('click', function () {
+      handleAccept(options);
+    });
+    actions.appendChild(accept);
 
     if (options.show_reject_button) {
       var reject = document.createElement('button');
@@ -369,14 +368,15 @@
       actions.appendChild(reject);
     }
 
-    var accept = document.createElement('button');
-    accept.className = 'iag-lgpd-button iag-lgpd-button-accept';
-    accept.type = 'button';
-    accept.textContent = 'Aceitar';
-    accept.addEventListener('click', function () {
-      handleAccept(options);
-    });
-    actions.appendChild(accept);
+    if (options.policy_url) {
+      var policyLink = document.createElement('a');
+      policyLink.className = 'iag-lgpd-policy-btn';
+      policyLink.href = options.policy_url;
+      policyLink.target = '_blank';
+      policyLink.rel = 'noopener noreferrer';
+      policyLink.textContent = 'Política de Privacidade';
+      actions.appendChild(policyLink);
+    }
 
     content.appendChild(actions);
     wrapper.appendChild(content);
@@ -392,21 +392,23 @@
     css += '.iag-lgpd-banner *{font:inherit;color:inherit;}';
     css += '.iag-lgpd-bottom_bar{width:100%;max-width:900px;border-radius:0;margin:0 auto;flex-direction:row;justify-content:space-between;align-items:center;flex-wrap:wrap;}';
     css += '.iag-lgpd-bottom_bar .iag-lgpd-message{flex:1 1 60%;min-width:220px;margin-right:20px;}';
-    css += '.iag-lgpd-bottom_bar .iag-lgpd-actions{flex:1 1 35%;justify-content:flex-end;}';
+    css += '.iag-lgpd-bottom_bar .iag-lgpd-actions{flex:1 1 35%;}';
     css += '.iag-lgpd-floating_left,.iag-lgpd-floating_right{position:fixed;bottom:16px;max-width:360px;width:calc(100% - 32px);margin:0;}';
     css += '.iag-lgpd-floating_left{left:16px;}';
     css += '.iag-lgpd-floating_right{right:16px;}';
-    css += '.iag-lgpd-floating_left .iag-lgpd-actions,.iag-lgpd-floating_right .iag-lgpd-actions{flex-direction:column;align-items:stretch;}';
-    css += '.iag-lgpd-floating_left .iag-lgpd-button,.iag-lgpd-floating_left .iag-lgpd-policy-btn,.iag-lgpd-floating_right .iag-lgpd-button,.iag-lgpd-floating_right .iag-lgpd-policy-btn{width:100%;}';
-    css += '.iag-lgpd-modal{max-width:600px;width:100%;border-radius:18px;margin:0;}';
+    css += '.iag-lgpd-modal{max-width:600px;width:100%;border-radius:18px;margin:10px;}';
     css += '.iag-lgpd-message{overflow-wrap:break-word;word-break:break-word;max-width:100%;}';
-    css += '.iag-lgpd-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;}';
+    css += '.iag-lgpd-actions{display:flex;flex-flow:column nowrap;gap:12px;align-items:stretch;justify-content:flex-start;text-align:center;}';
     css += '.iag-lgpd-button,.iag-lgpd-policy-btn{border:none;border-radius:8px;padding:10px 16px;text-decoration:none;cursor:pointer;font:0.95rem inherit;transition:transform .15s ease,opacity .15s ease;}';
     css += '.iag-lgpd-button{background:' + options.btn_bg_color + ';color:' + options.btn_text_color + ';}';
+    css += '.iag-lgpd-button-reject{background:transparent;color:' + options.banner_text_color + ';border:1px solid ' + options.banner_text_color + ';padding: 9px 15px;}';
+    css += '.iag-lgpd-button-accept{text-transform:uppercase;font-weight:bold;}';
     css += '.iag-lgpd-button:hover{opacity:.92;transform:translateY(-1px);}';
-    css += '.iag-lgpd-policy-btn{background:transparent;color:' + options.banner_text_color + ';border:1px solid ' + options.banner_text_color + ';}';
+    css += '.iag-lgpd-policy-btn{background:transparent;color:' + options.banner_text_color + ';border:none;text-decoration:underline;}';
     css += '.iag-lgpd-policy-btn:hover{opacity:.9;}';
-    css += '@media (max-width:720px){.iag-lgpd-bottom_bar{flex-direction:column;}.iag-lgpd-bottom_bar .iag-lgpd-message{margin-right:0;}.iag-lgpd-bottom_bar .iag-lgpd-actions{flex-direction:column;align-items:stretch;justify-content:flex-start;width:100%;text-align:center;}.iag-lgpd-bottom_bar .iag-lgpd-button,.iag-lgpd-bottom_bar .iag-lgpd-policy-btn{width:100%;}.iag-lgpd-floating_left,.iag-lgpd-floating_right{left:16px;right:16px;width:auto;max-width:none;bottom:16px;}.iag-lgpd-actions{justify-content:center;}}';
+    css += '.iag-lgpd-actions .iag-lgpd-button,.iag-lgpd-actions .iag-lgpd-policy-btn{width:100%;}';
+    css += '@media (min-width:721px){.iag-lgpd-modal .iag-lgpd-actions{flex-flow:row nowrap;align-items:center;justify-content:flex-end;text-align:left;}.iag-lgpd-modal .iag-lgpd-policy-btn{order:1;width:auto;padding-left:0;padding-right:0;margin-right:auto;}.iag-lgpd-modal .iag-lgpd-button-reject{order:2;width:auto;min-width:120px;}.iag-lgpd-modal .iag-lgpd-button-accept{order:3;width:auto;min-width:180px;}}';
+    css += '@media (max-width:720px){.iag-lgpd-bottom_bar{flex-direction:column;}.iag-lgpd-bottom_bar .iag-lgpd-message{margin-right:0;}.iag-lgpd-bottom_bar .iag-lgpd-actions{width:100%;}.iag-lgpd-floating_left,.iag-lgpd-floating_right{left:16px;right:16px;width:auto;max-width:none;bottom:16px;}}';
     css += options.custom_css || '';
     injectStyles(css);
   }
